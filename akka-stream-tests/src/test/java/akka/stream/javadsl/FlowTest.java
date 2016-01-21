@@ -28,6 +28,7 @@ import scala.concurrent.duration.Duration;
 import scala.concurrent.duration.FiniteDuration;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -565,11 +566,7 @@ public class FlowTest extends StreamTest {
   public void mustBeAbleToUseMapAsync() throws Exception {
     final JavaTestKit probe = new JavaTestKit(system);
     final Iterable<String> input = Arrays.asList("a", "b", "c");
-    final Flow<String, String, NotUsed> flow = Flow.of(String.class).mapAsync(4, new Function<String, Future<String>>() {
-      public Future<String> apply(String elem) {
-        return Futures.successful(elem.toUpperCase());
-      }
-    });
+    final Flow<String, String, NotUsed> flow = Flow.of(String.class).mapAsync(4, elem -> CompletableFuture.completedFuture(elem.toUpperCase()));
     Source.from(input).via(flow).runForeach(new Procedure<String>() {
       public void apply(String elem) {
         probe.getRef().tell(elem, ActorRef.noSender());

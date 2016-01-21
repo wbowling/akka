@@ -41,7 +41,7 @@ object Tcp extends ExtensionId[Tcp] with ExtensionIdProvider {
      *
      * The produced [[scala.concurrent.Future]] is fulfilled when the unbinding has been completed.
      */
-    def unbind(): Future[Unit] = delegate.unbind()
+    def unbind(): CompletionStage[Unit] = delegate.unbind().toJava
   }
 
   /**

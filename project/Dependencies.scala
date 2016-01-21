@@ -111,7 +111,7 @@ object Dependencies {
   // TODO check if `l ++=` everywhere expensive?
   val l = libraryDependencies
 
-  val actor = l ++= Seq(config)
+  val actor = l ++= Seq(config, java8Compat)
 
   val testkit = l ++= Seq(Test.junit, Test.scalatest.value) ++ Test.metricsAll
 
@@ -186,7 +186,6 @@ object Dependencies {
   lazy val stream = l ++= Seq[sbt.ModuleID](
     sslConfigAkka,
     reactiveStreams,
-    java8Compat,
     Test.junitIntf,
     Test.scalatest.value)
 

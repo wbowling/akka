@@ -27,6 +27,8 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
 import static akka.pattern.Patterns.ask;
 import static docs.stream.TwitterStreamQuickstartDocTest.Model.AKKA;
@@ -80,10 +82,10 @@ public class IntegrationDocTest {
 
   class AddressSystem2 {
     //#email-address-lookup2
-    public Future<String> lookupEmail(String handle)
+    public CompletionStage<String> lookupEmail(String handle)
     //#email-address-lookup2
     {
-      return Futures.successful(handle + "@somewhere.com");
+      return CompletableFuture.completedFuture(handle + "@somewhere.com");
     }
   }
 

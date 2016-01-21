@@ -5,7 +5,7 @@ package akka.stream.javadsl;
 
 import akka.NotUsed;
 import akka.japi.Pair;
-import akka.pattern.Patterns;
+import akka.pattern.PatternsCS;
 import akka.japi.tuple.Tuple4;
 import akka.stream.*;
 import akka.stream.javadsl.GraphDSL.Builder;
@@ -311,7 +311,7 @@ public class FlowGraphTest extends StreamTest {
     final CompletionStage<Integer> future = RunnableGraph.fromGraph(
       GraphDSL.create(Sink.<Integer> head(), (b, out) -> {
         b.from(b.add(Source.single(1))).to(out);
-        b.from(b.materializedValue()).to(b.add(Sink.foreach(mat -> Patterns.pipe(mat, system.dispatcher()).to(probe.ref()))));
+        b.from(b.materializedValue()).to(b.add(Sink.foreach(mat -> PatternsCS.pipe(mat, system.dispatcher()).to(probe.ref()))));
         return ClosedShape.getInstance();
     })).run(materializer);
 

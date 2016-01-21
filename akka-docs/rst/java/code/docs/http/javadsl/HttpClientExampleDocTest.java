@@ -22,6 +22,8 @@ import scala.util.Try;
 
 import static akka.pattern.Patterns.*;
 
+import java.util.concurrent.CompletionStage;
+
 @SuppressWarnings("unused")
 public class HttpClientExampleDocTest {
 
@@ -32,9 +34,9 @@ public class HttpClientExampleDocTest {
         final ActorSystem system = ActorSystem.create();
         final ActorMaterializer materializer = ActorMaterializer.create(system);
 
-        final Flow<HttpRequest, HttpResponse, Future<OutgoingConnection>> connectionFlow =
+        final Flow<HttpRequest, HttpResponse, CompletionStage<OutgoingConnection>> connectionFlow =
                 Http.get(system).outgoingConnection("akka.io", 80);
-        final Future<HttpResponse> responseFuture =
+        final CompletionStage<HttpResponse> responseFuture =
                 Source.single(HttpRequest.create("/"))
                         .via(connectionFlow)
                         .runWith(Sink.<HttpResponse>head(), materializer);
@@ -56,7 +58,7 @@ public class HttpClientExampleDocTest {
 
     // construct a pool client flow with context type `Integer`
 
-    final Future<Pair<Try<HttpResponse>, Integer>> responseFuture =
+    final CompletionStage<Pair<Try<HttpResponse>, Integer>> responseFuture =
       Source
         .single(Pair.create(HttpRequest.create("/"), 42))
         .via(poolClientFlow)

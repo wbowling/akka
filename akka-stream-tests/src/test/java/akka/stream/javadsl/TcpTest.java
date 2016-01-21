@@ -113,7 +113,7 @@ public class TcpTest extends StreamTest {
     try {
       Source.from(testInput)
           .viaMat(Tcp.get(system).outgoingConnection(serverAddress.getHostString(), serverAddress.getPort()),
-                  Keep.<NotUsed, Future<OutgoingConnection>> right())
+                  Keep.right())
           .to(Sink.<ByteString> ignore())
           .run(materializer)
           .toCompletableFuture().get(5, TimeUnit.SECONDS);

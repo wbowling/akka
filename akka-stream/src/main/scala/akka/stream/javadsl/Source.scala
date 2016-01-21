@@ -26,6 +26,8 @@ import scala.concurrent.{ Future, Promise }
 import scala.language.{ higherKinds, implicitConversions }
 import scala.compat.java8.OptionConverters._
 import java.util.concurrent.CompletionStage
+import java.util.concurrent.CompletableFuture
+import scala.compat.java8.FutureConverters._
 
 /** Java API */
 object Source {
@@ -48,11 +50,11 @@ object Source {
    * If the downstream of this source cancels before the promise has been completed, then the promise will be completed
    * with None.
    */
-  def maybe[T]: Source[T, Promise[Optional[T]]] = {
+  def maybe[T]: Source[T, CompletableFuture[Optional[T]]] = {
     new Source(scaladsl.Source.maybe[T].mapMaterializedValue { scalaOptionPromise: Promise[Option[T]] ⇒
-      val javaOptionPromise = Promise[Optional[T]]()
+      val javaOptionPromise = new CompletableFuture[Optional[T]]()
       scalaOptionPromise.completeWith(
-        javaOptionPromise.future
+        javaOptionPromise.toScala
           .map(_.asScala)(akka.dispatch.ExecutionContexts.sameThreadExecutionContext))
 
       javaOptionPromise
