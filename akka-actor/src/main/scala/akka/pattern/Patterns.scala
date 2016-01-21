@@ -7,11 +7,12 @@ import akka.actor.{ ActorSelection, Scheduler }
 import java.util.concurrent.{ Callable, TimeUnit }
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
+import java.util.concurrent.CompletionStage
 
 object Patterns {
   import akka.japi
   import akka.actor.{ ActorRef, ActorSystem }
-  import akka.pattern.{ ask ⇒ scalaAsk, pipe ⇒ scalaPipe, gracefulStop ⇒ scalaGracefulStop, after ⇒ scalaAfter }
+  import akka.pattern.{ ask ⇒ scalaAsk, pipe ⇒ scalaPipe, pipeCompletionStage ⇒ scalaPipeCS, gracefulStop ⇒ scalaGracefulStop, after ⇒ scalaAfter }
   import akka.util.Timeout
   import scala.concurrent.Future
   import scala.concurrent.duration._
@@ -212,6 +213,25 @@ object Patterns {
    * }}}
    */
   def pipe[T](future: Future[T], context: ExecutionContext): PipeableFuture[T] = scalaPipe(future)(context)
+
+  /**
+   * Register an onComplete callback on this [[scala.concurrent.Future]] to send
+   * the result to the given [[akka.actor.ActorRef]] or [[akka.actor.ActorSelection]].
+   * Returns the original Future to allow method chaining.
+   * If the future was completed with failure it is sent as a [[akka.actor.Status.Failure]]
+   * to the recipient.
+   *
+   * <b>Recommended usage example:</b>
+   *
+   * {{{
+   *   final Future<Object> f = Patterns.ask(worker, request, timeout);
+   *   // apply some transformation (i.e. enrich with request info)
+   *   final Future<Object> transformed = f.map(new akka.japi.Function<Object, Object>() { ... });
+   *   // send it on to the next stage
+   *   Patterns.pipe(transformed).to(nextActor);
+   * }}}
+   */
+  def pipe[T](future: CompletionStage[T], context: ExecutionContext): PipeableCompletionStage[T] = scalaPipeCS(future)(context)
 
   /**
    * Returns a [[scala.concurrent.Future]] that will be completed with success (value `true`) when

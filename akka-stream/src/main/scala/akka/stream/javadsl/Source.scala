@@ -6,7 +6,6 @@ package akka.stream.javadsl
 import java.io.{ OutputStream, InputStream, File }
 import java.util
 import java.util.Optional
-
 import akka.{ Done, NotUsed }
 import akka.actor.{ ActorRef, Cancellable, Props }
 import akka.event.LoggingAdapter
@@ -25,8 +24,8 @@ import scala.collection.immutable.Range.Inclusive
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ Future, Promise }
 import scala.language.{ higherKinds, implicitConversions }
-
 import scala.compat.java8.OptionConverters._
+import java.util.concurrent.CompletionStage
 
 /** Java API */
 object Source {
@@ -161,6 +160,15 @@ object Source {
     new Source(scaladsl.Source.fromFuture(future))
 
   /**
+   * Start a new `Source` from the given `Future`. The stream will consist of
+   * one element when the `Future` is completed with a successful value, which
+   * may happen before or after materializing the `Flow`.
+   * The stream terminates with a failure if the `Future` is completed with a failure.
+   */
+  def fromCompletionStage[O](future: CompletionStage[O]): javadsl.Source[O, NotUsed] =
+    new Source(scaladsl.Source.fromCompletionStage(future))
+
+  /**
    * Elements are emitted periodically with the specified interval.
    * The tick element will be delivered to downstream consumers that has requested any elements.
    * If a consumer has not requested any elements at the point in time when the tick
@@ -262,7 +270,7 @@ object Source {
   /**
    * Combines several sources with fan-in strategy like `Merge` or `Concat` and returns `Source`.
    */
-  def combine[T, U](first: Source[T, _], second: Source[T, _], rest: java.util.List[Source[T, _]],
+  def combine[T, U](first: Source[T, _ <: Any], second: Source[T, _ <: Any], rest: java.util.List[Source[T, _ <: Any]],
                     strategy: function.Function[java.lang.Integer, _ <: Graph[UniformFanInShape[T, U], NotUsed]]): Source[U, NotUsed] = {
     import scala.collection.JavaConverters._
     val seq = if (rest != null) rest.asScala.map(_.asScala) else Seq()
@@ -454,7 +462,7 @@ final class Source[+Out, +Mat](delegate: scaladsl.Source[Out, Mat]) extends Grap
    * function evaluation when the input stream ends, or completed with `Failure`
    * if there is a failure is signaled in the stream.
    */
-  def runFold[U](zero: U, f: function.Function2[U, Out, U], materializer: Materializer): Future[U] =
+  def runFold[U](zero: U, f: function.Function2[U, Out, U], materializer: Materializer): CompletionStage[U] =
     runWith(Sink.fold(zero, f), materializer)
 
   /**
@@ -711,7 +719,7 @@ final class Source[+Out, +Mat](delegate: scaladsl.Source[Out, Mat]) extends Grap
    * normal end of the stream, or completed with `Failure` if there is a failure is signaled in
    * the stream.
    */
-  def runForeach(f: function.Procedure[Out], materializer: Materializer): Future[Done] =
+  def runForeach(f: function.Procedure[Out], materializer: Materializer): CompletionStage[Done] =
     runWith(Sink.foreach(f), materializer)
 
   // COMMON OPS //
@@ -1263,7 +1271,7 @@ final class Source[+Out, +Mat](delegate: scaladsl.Source[Out, Mat]) extends Grap
    * @param seed Provides the first state for a batched value using the first unconsumed element as a start
    * @param aggregate Takes the currently batched value and the current pending element to produce a new aggregate
    */
-  def batch[S](max: Long, seed: function.Function[Out, S],aggregate: function.Function2[S, Out, S]): javadsl.Source[S, Mat] =
+  def batch[S](max: Long, seed: function.Function[Out, S], aggregate: function.Function2[S, Out, S]): javadsl.Source[S, Mat] =
     new Source(delegate.batch(max, seed.apply)(aggregate.apply))
 
   /**
@@ -1294,7 +1302,7 @@ final class Source[+Out, +Mat](delegate: scaladsl.Source[Out, Mat]) extends Grap
    * @param seed Provides the first state for a batched value using the first unconsumed element as a start
    * @param aggregate Takes the currently batched value and the current pending element to produce a new batch
    */
-  def batchWeighted[S](max: Long, costFn: function.Function[Out, Long], seed: function.Function[Out, S],aggregate: function.Function2[S, Out, S]): javadsl.Source[S, Mat] =
+  def batchWeighted[S](max: Long, costFn: function.Function[Out, Long], seed: function.Function[Out, S], aggregate: function.Function2[S, Out, S]): javadsl.Source[S, Mat] =
     new Source(delegate.batchWeighted(max, costFn.apply, seed.apply)(aggregate.apply))
 
   /**
