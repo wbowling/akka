@@ -437,50 +437,6 @@ private[akka] final case class Completed[T]() extends PushPullStage[T, T] {
 /**
  * INTERNAL API
  */
-private[akka] final case class Conflate[In, Out](seed: In ⇒ Out, aggregate: (Out, In) ⇒ Out,
-                                                 decider: Supervision.Decider) extends DetachedStage[In, Out] {
-  private var agg: Any = null
-
-  override def onPush(elem: In, ctx: DetachedContext[Out]): UpstreamDirective = {
-    agg =
-      if (agg == null) seed(elem)
-      else aggregate(agg.asInstanceOf[Out], elem)
-
-    if (!ctx.isHoldingDownstream) ctx.pull()
-    else {
-      val result = agg.asInstanceOf[Out]
-      agg = null
-      ctx.pushAndPull(result)
-    }
-  }
-
-  override def onPull(ctx: DetachedContext[Out]): DownstreamDirective = {
-    if (ctx.isFinishing) {
-      if (agg == null) ctx.finish()
-      else {
-        val result = agg.asInstanceOf[Out]
-        agg = null
-        ctx.pushAndFinish(result)
-      }
-    } else if (agg == null) ctx.holdDownstream()
-    else {
-      val result = agg.asInstanceOf[Out]
-      if (result == null) throw new NullPointerException
-      agg = null
-      ctx.push(result)
-    }
-  }
-
-  override def onUpstreamFinish(ctx: DetachedContext[Out]): TerminationDirective = ctx.absorbTermination()
-
-  override def decide(t: Throwable): Supervision.Directive = decider(t)
-
-  override def restart(): Conflate[In, Out] = copy()
-}
-
-/**
- * INTERNAL API
- */
 private[akka] final case class Batch[In, Out](max: Long, costFn: In ⇒ Long, seed: In ⇒ Out, aggregate: (Out, In) ⇒ Out)
   extends GraphStage[FlowShape[In, Out]] {
 
@@ -490,6 +446,9 @@ private[akka] final case class Batch[In, Out](max: Long, costFn: In ⇒ Long, se
   override val shape: FlowShape[In, Out] = FlowShape.of(in, out)
 
   override def createLogic(inheritedAttributes: Attributes): GraphStageLogic = new GraphStageLogic(shape) {
+
+    val decider = inheritedAttributes.getAttribute(classOf[SupervisionStrategy]).map(_.decider).getOrElse(Supervision.stoppingDecider)
+
     private var agg: Out = null.asInstanceOf[Out]
     private var left: Long = max
     private var pending: In = null.asInstanceOf[In]
@@ -512,20 +471,24 @@ private[akka] final case class Batch[In, Out](max: Long, costFn: In ⇒ Long, se
     setHandler(in, new InHandler {
 
       override def onPush(): Unit = {
-        val elem = grab(in)
-        val cost = costFn(elem)
-        if (agg == null) {
-          left -= cost
-          agg = seed(elem)
-        } else if (left < cost) {
-          pending = elem
-        } else {
-          left -= cost
-          agg = aggregate(agg, elem)
-        }
+        try {
+          val elem = grab(in)
+          val cost = costFn(elem)
+          if (agg == null) {
+            left -= cost
+            agg = seed(elem)
+          } else if (left < cost) {
+            pending = elem
+          } else {
+            left -= cost
+            agg = aggregate(agg, elem)
+          }
 
-        if (isAvailable(out)) flush()
-        if (pending == null) pull(in)
+          if (isAvailable(out)) flush()
+          if (pending == null) pull(in)
+        } catch {
+          case NonFatal(ex) ⇒ handleError(ex)
+        }
       }
 
       override def onUpstreamFinish(): Unit = {
@@ -536,22 +499,37 @@ private[akka] final case class Batch[In, Out](max: Long, costFn: In ⇒ Long, se
     setHandler(out, new OutHandler {
 
       override def onPull(): Unit = {
-        if (agg == null) {
-          if (isClosed(in)) completeStage()
-          else if (!hasBeenPulled(in)) pull(in)
-        } else if (isClosed(in)) {
-          push(out, agg)
-          if (pending == null) completeStage()
-          else {
-            agg = seed(pending)
-            pending = null.asInstanceOf[In]
+        try {
+          if (agg == null) {
+            if (isClosed(in)) completeStage()
+            else if (!hasBeenPulled(in)) pull(in)
+          } else if (isClosed(in)) {
+            push(out, agg)
+            if (pending == null) completeStage()
+            else {
+              agg = seed(pending)
+              pending = null.asInstanceOf[In]
+            }
+          } else {
+            flush()
+            if (!hasBeenPulled(in)) pull(in)
           }
-        } else {
-          flush()
-          if (!hasBeenPulled(in)) pull(in)
+        } catch {
+          case NonFatal(ex) ⇒ handleError(ex)
         }
       }
     })
+
+    private def handleError(throwable: Throwable): Unit = {
+      decider(throwable) match {
+        case Supervision.Stop ⇒ failStage(throwable)
+        case Supervision.Restart ⇒
+          var agg: Out = null.asInstanceOf[Out]
+          var left: Long = max
+          var pending: In = null.asInstanceOf[In]
+
+      }
+    }
   }
 }
 

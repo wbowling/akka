@@ -4,6 +4,7 @@
 package akka.stream.impl.fusing
 
 import akka.NotUsed
+import akka.stream.impl.ConstantFun
 import akka.stream.{ Attributes, Shape, Supervision }
 import akka.stream.stage.AbstractStage.PushPullGraphStage
 import akka.stream.stage.GraphStageWithMaterializedValue
@@ -100,10 +101,11 @@ class InterpreterStressSpec extends AkkaSpec with GraphInterpreterSpecKit {
 
     }
 
-    "work with a massive chain of conflates by overflowing to the heap" in new OneBoundedSetup[Int](Vector.fill(chainLength / 10)(Conflate(
+    "work with a massive chain of batches by overflowing to the heap" in new OneBoundedSetup[Int](Vector.fill(chainLength / 10)(Batch(
+      0L,
+      ConstantFun.zeroLong,
       (in: Int) ⇒ in,
-      (agg: Int, in: Int) ⇒ agg + in,
-      Supervision.stoppingDecider))) {
+      (agg: Int, in: Int) ⇒ agg + in)): _*) {
 
       lastEvents() should be(Set(RequestOne))
 
